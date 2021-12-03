@@ -1,0 +1,241 @@
+---
+title: "PracticalMachineLearning"
+author: "Nthabiseng Mogoane"
+date: "11/30/2021"
+output: html_document
+---
+
+Overview
+
+Writing a report, the  Peer-graded assessment week 4 for Pratical 
+machine Learning.
+
+In completing this report, we will be using the accelerometers 
+on thebelt, forearm, arm,and dumbell of 6 participants to predict
+the manner in which they did the exercis that will follow. This is the "classe"
+variable in the training set.We train 4 Models: Decision Tree, Random Forest, Gradient Booseted
+Trees,Support Vector Machine using k-folds cross validation on the training set.
+the machine learning alogorithm described here is applied to the 20 test
+cases available in the test data and the predictions will be submitted via Git as 
+illustrated in the course instructions.
+
+
+Background And Introduction
+
+Using the devices such as Jawbone Up, Nike FuelBand, and
+Fitbit it is now possible to collect a large amount of data
+about personal activity inexpensivlely. These type of devices 
+are part of the quantified self movement, a group of enthusiasts 
+who take measurements about themselves regularly to improve their
+health, to find patterns in their behavior,or because they are tech geeks.
+One thing that people regularly do is quantify how much of a particular activity they do,
+but they rarely quantify how well they do it .
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Loading the Data and the Libraries
+
+```{r}
+library(knitr)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(rattle)
+library(randomForest)
+library(corrplot)
+set.seed(12345)
+```
+
+Downloading the data
+
+```{r}
+trainUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+testUrl <- "http://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+```
+
+Downloading the data sets
+
+```{r}
+training <- read.csv(url(trainUrl),na.strings=c("NA","#DIV/0!",""))
+testing <- read.csv(url(testUrl),na.strings=c("NA","#DIV/0!",""))
+
+
+#Display results
+
+dim(training)
+
+dim(testing)
+
+```
+
+Creating a partition using the data set for training
+
+```{r}
+inTrain  <- createDataPartition(training$classe, p=0.7, list=FALSE)
+TrainSet <- training[inTrain, ]
+TestSet  <- training[-inTrain, ]
+dim(TrainSet)
+
+    
+```
+
+#The created datasets both have 160 Variables. The variables have plenty of NA,that can be removed using the procedures that will follow.The Near Zero Variance(NZV) variables will also be removed and the ID variables are going to be removed also.
+
+
+```{r}
+#Variables with Nearly Zero Variance are removed
+
+NZV <- nearZeroVar(TrainSet)
+TrainSet <- TrainSet[, -NZV]
+TestSet  <- TestSet[, -NZV]
+dim(TrainSet)
+dim(TestSet)
+
+```
+
+```{r}
+#Variables that mostly NA are removed using a Function
+AllNA    <- sapply(TrainSet, function(x) mean(is.na(x))) > 0.95
+TrainSet <- TrainSet[, AllNA==FALSE]
+TestSet  <- TestSet[, AllNA==FALSE]
+dim(TrainSet)
+
+dim(TestSet)
+
+```
+
+```{r}
+
+#Removing the ID Variables in columns 1 to 5
+TrainSet <- TrainSet[, -(1:5)]
+TestSet <-TestSet[, -(1:5)]
+
+dim(TrainSet)
+
+dim(TestSet)
+
+```
+
+#After cleaning that performed on the above code,the number of variables for the analysis have been reduced to 54.
+
+
+Correlation Analysis
+
+```{r}
+corMatrix <- cor(TrainSet[, -54])
+corrplot(corMatrix, order = "FPC", method = "color", type = "lower", 
+         tl.cex = 0.8, tl.col = rgb(0, 0, 0))
+
+```
+
+#The highly correlated variables are demonstrated by dark colors on the graph above.
+
+The Prediction
+
+Random Forest method
+
+```{r}
+set.seed(12345)
+controlRF <- trainControl(method = "cv", number = 3, verboseIter = FALSE)
+modFitRandForest <- train(classe ~ ., data = SetTrain, method = "rf", 
+                          trControl = controlRF)
+modFitRandForest$finalModel
+
+```
+
+```{r}
+#Prediction on Test dataset
+predictRandForest <- predict(modFitRandForest, newdata = SetTest)
+confMatRandForest <- confusionMatrix(predictRandForest, SetTest$classe)
+confMatRandForest
+
+```
+
+```{r}
+#The plot for matrix Results
+plot(confmatRandForest$table, col = confMatRandForest$byClass,
+     main = paste("Random Forest - Accuracy =",
+                  round(confMatrandForest$overall['Accuracy'], 4)))
+
+```
+
+```{r}
+
+#Decision Trees Method
+
+set.seed(12345)
+modFitDeciTree <- rpart(classe ~ ., data = SetTrain, method = "class")
+fancyRpartPlot(modFitDeciTree)
+
+```
+
+```{r}
+
+#Test data set prediction
+#Test data set prediction
+predictDeciTree <- predict(modFitDeciTree, newdata = SetTest, type = "class")
+confMatDeciTree <- confusionMatrix(predictDeciTree, SetTest$classe)
+confMatDeciTree
+
+```
+
+```{r}
+
+#The results for plot matrix
+plot(confMatDeciTree$table, col = confMatDecTree$byClass,
+     main = paste("Decision Tree - Accuracy =",
+                  round(confMatDeciTree$overall['Accuracy'], 4)))
+
+```
+
+```{r}
+#Generalized Boosted Model Method
+
+set.seed(12345)
+controlGBM <- trainControl(method = "repeatedcv", number = 5, repeats = 1)
+modFitGBM <- train(classe ~ ., data = SetTrain, method = "gbm",
+                   trControl = controlGBM, verbose = FALSE)
+modFitGBM$finalModel
+
+```
+
+```{r}
+
+#Test dataset Prediction
+predictGBM <- predict(modFitGBM, newdata =SetTest)
+confMatGBM <- confusionMatrix(predictGBM, SetTest$classe)
+confMatGBM
+
+```
+
+```{r}
+
+#The plot for Plot GBM Matrix results
+plot(confMatGBM$table, col = confMatGBM$byClass,
+     main = paste("GBM -Accuracy =",round(confMatGBM$overall['Accuracy'], 4)))
+
+```
+
+#The Application of selected Model to the Test Data
+
+#The 3 modeling methods on the graphs above shows the following accuracy
+#i. Random Forest : 0.9963
+#ii. Decision Tree : 0.7368
+#iii. GBM : 0.9839
+
+
+#Therefore, the Random Forest Model will be applied to predict the 20 quiz results.
+
+```{r}
+predictTEST <- predict(modFitrandForest, newdata = testing)
+predictTEST
+
+```
+
+
+
+
+
+
